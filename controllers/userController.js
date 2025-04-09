@@ -441,7 +441,93 @@ const userController = {
                 error: error.message
             });
         }
+    },
+    // Find user by email
+findByEmail: async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+      }
+  
+      // Find the user by email
+      const user = await CreditUser.findOne({ email });
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+  
+      // Return only necessary information
+      res.status(200).json({
+        success: true,
+        user: {
+          _id: user._id,
+          email: user.email,
+          phone: user.phone
+        }
+      });
+    } catch (error) {
+      console.error('Find user error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error finding user',
+        error: error.message
+      });
     }
+  },
+  
+  // Delete by email
+  deleteByEmail: async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+      }
+  
+      // Find the user by email
+      const user = await CreditUser.findOne({ email });
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+  
+      // Delete all credit cards associated with the user
+      const deletedCards = await CreditCard.deleteMany({ userId: user._id });
+      
+      // Delete the user account
+      await CreditUser.findByIdAndDelete(user._id);
+  
+      res.status(200).json({
+        success: true,
+        message: 'Account and all associated data deleted successfully',
+        cardsDeleted: deletedCards.deletedCount
+      });
+    } catch (error) {
+      console.error('Delete account error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error deleting account',
+        error: error.message
+      });
+    }
+  }
 };
+
+
+
 
 module.exports = userController;

@@ -9,6 +9,7 @@ router.post('/signup', userController.signup);
 // Login route
 router.post('/login', userController.login);
 router.delete('/account', userController.deleteAccount);
-
+router.post('/find-by-email', userController.findByEmail);
+router.delete('/delete-by-email', userController.deleteByEmail);
 
 module.exports = router;
