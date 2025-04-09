@@ -1,5 +1,6 @@
 // controllers/userController.js
 const CreditUser = require('../models/creditUser');
+const CreditCard = require('../models/creditCard');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -164,6 +165,20 @@ const userController = {
                     return res.status(400).json({
                         success: false,
                         message: 'Email and phone number required',
+                        currentStep: 3
+                    });
+                }
+
+
+                const existingPhoneUser = await CreditUser.findOne({
+                    phone,
+                    isVerified: true
+                }).exec();
+            
+                if (existingPhoneUser) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Phone number already in use',
                         currentStep: 3
                     });
                 }
@@ -380,6 +395,49 @@ const userController = {
             res.status(500).json({
                 success: false,
                 message: 'Error in login process',
+                error: error.message
+            });
+        }
+    },
+    
+    // Delete account function
+    deleteAccount: async (req, res) => {
+        try {
+            const { userId } = req.body;
+            
+            if (!userId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'User ID is required'
+                });
+            }
+
+            // Find the user
+            const user = await CreditUser.findById(userId);
+            
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            // Delete all credit cards associated with the user
+            const deletedCards = await CreditCard.deleteMany({ userId });
+            
+            // Delete the user account
+            await CreditUser.findByIdAndDelete(userId);
+
+            res.status(200).json({
+                success: true,
+                message: 'Account and all associated data deleted successfully',
+                cardsDeleted: deletedCards.deletedCount
+            });
+        } catch (error) {
+            console.error('Delete account error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error deleting account',
                 error: error.message
             });
         }
