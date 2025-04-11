@@ -234,7 +234,8 @@ const creditCardController = {
     deleteCard: async (req, res) => {
         try {
             const { lastFourDigits } = req.params;
-
+            console.log(`Attempting to delete card: ${lastFourDigits} for user: ${req.user.userId}`);
+    
             // Validate format
             if (!/^\d{4}$/.test(lastFourDigits)) {
                 return res.status(400).json({
@@ -242,25 +243,26 @@ const creditCardController = {
                     message: 'Invalid last four digits format'
                 });
             }
-
+    
             const card = await CreditCard.findOneAndDelete({
                 userId: req.user.userId,
                 lastFourDigits: lastFourDigits.trim()
             }).exec();
-
+    
             if (!card) {
                 return res.status(404).json({
                     success: false,
                     message: 'Card not found'
                 });
             }
-
+    
+            console.log(`Card ${lastFourDigits} deleted successfully`);
             res.status(200).json({
                 success: true,
                 message: 'Card deleted successfully',
                 card: card.toJSON()
             });
-
+    
         } catch (error) {
             console.error('Delete card error:', error);
             res.status(500).json({

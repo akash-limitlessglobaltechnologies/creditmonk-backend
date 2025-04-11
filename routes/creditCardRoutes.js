@@ -4,6 +4,19 @@ const router = express.Router();
 const creditCardController = require('../controllers/creditCardController');
 const authMiddleware = require('../middlewares/auth');
 
+// Logging middleware to debug requests
+router.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  console.log('Headers:', JSON.stringify(req.headers));
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log('Request body:', JSON.stringify(req.body));
+  }
+  if (req.method === 'DELETE') {
+    console.log('Delete request params:', JSON.stringify(req.params));
+  }
+  next();
+});
+
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 

@@ -1,8 +1,8 @@
 // controllers/userController.js
 const CreditUser = require('../models/creditUser');
-const CreditCard = require('../models/creditCard');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
+const CreditCard = require('../models/creditCard');
 const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 
@@ -165,20 +165,6 @@ const userController = {
                     return res.status(400).json({
                         success: false,
                         message: 'Email and phone number required',
-                        currentStep: 3
-                    });
-                }
-
-
-                const existingPhoneUser = await CreditUser.findOne({
-                    phone,
-                    isVerified: true
-                }).exec();
-            
-                if (existingPhoneUser) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Phone number already in use',
                         currentStep: 3
                     });
                 }
@@ -399,135 +385,49 @@ const userController = {
             });
         }
     },
-    
-    // Delete account function
-    deleteAccount: async (req, res) => {
-        try {
-            const { userId } = req.body;
-            
-            if (!userId) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'User ID is required'
-                });
-            }
+    // Add this method to the userController object in controllers/userController.js
 
-            // Find the user
-            const user = await CreditUser.findById(userId);
-            
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
-
-            // Delete all credit cards associated with the user
-            const deletedCards = await CreditCard.deleteMany({ userId });
-            
-            // Delete the user account
-            await CreditUser.findByIdAndDelete(userId);
-
-            res.status(200).json({
-                success: true,
-                message: 'Account and all associated data deleted successfully',
-                cardsDeleted: deletedCards.deletedCount
-            });
-        } catch (error) {
-            console.error('Delete account error:', error);
-            res.status(500).json({
+deleteAccount: async (req, res) => {
+    console.log('Delete account request received');
+    console.log('User in request:', req.user);
+    try {
+        const userId = req.user.userId;
+        
+        if (!userId) {
+            return res.status(400).json({
                 success: false,
-                message: 'Error deleting account',
-                error: error.message
+                message: 'User ID is required'
             });
         }
-    },
-    // Find user by email
-findByEmail: async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email is required'
-        });
-      }
-  
-      // Find the user by email
-      const user = await CreditUser.findOne({ email });
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-  
-      // Return only necessary information
-      res.status(200).json({
-        success: true,
-        user: {
-          _id: user._id,
-          email: user.email,
-          phone: user.phone
+
+        // Find the user
+        const user = await CreditUser.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
-      });
-    } catch (error) {
-      console.error('Find user error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error finding user',
-        error: error.message
-      });
-    }
-  },
-  
-  // Delete by email
-  deleteByEmail: async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email is required'
+
+        // Delete all associated cards
+        await CreditCard.deleteMany({ userId });
+
+        // Delete the user
+        await CreditUser.findByIdAndDelete(userId);
+
+        res.status(200).json({
+            success: true,
+            message: 'Account deleted successfully'
         });
-      }
-  
-      // Find the user by email
-      const user = await CreditUser.findOne({ email });
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-  
-      // Delete all credit cards associated with the user
-      const deletedCards = await CreditCard.deleteMany({ userId: user._id });
-      
-      // Delete the user account
-      await CreditUser.findByIdAndDelete(user._id);
-  
-      res.status(200).json({
-        success: true,
-        message: 'Account and all associated data deleted successfully',
-        cardsDeleted: deletedCards.deletedCount
-      });
     } catch (error) {
-      console.error('Delete account error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error deleting account',
-        error: error.message
-      });
+        console.error('Delete account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting account',
+            error: error.message
+        });
     }
-  }
+}
 };
-
-
-
 
 module.exports = userController;
