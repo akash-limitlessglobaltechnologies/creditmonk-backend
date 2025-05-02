@@ -427,6 +427,169 @@ deleteAccount: async (req, res) => {
             error: error.message
         });
     }
+},
+forgetPin: async (req, res) => {
+    try {
+        const { identifier, step, otp, newPin } = req.body;
+
+        if (!identifier) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email or phone number is required',
+                currentStep: 1
+            });
+        }
+
+        const isEmail = identifier.includes('@');
+        const query = isEmail ? { email: identifier } : { phone: identifier };
+        query.isVerified = true;
+
+        const user = await CreditUser.findOne(query).exec();
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found or not verified',
+                currentStep: 1
+            });
+        }
+
+        // Step 1: Send OTP
+        if (!step || step === 1) {
+            // Generate OTP and set expiry time
+            const otp = generateOTP();
+            const otpExpiryTime = new Date(Date.now() + 5 * 60 * 1000);
+
+            if (isEmail) {
+                // Send OTP via email
+                await sendOTPEmail(user.email, otp);
+
+                // Update user with email OTP
+                user.emailOtp = {
+                    code: otp,
+                    expiresAt: otpExpiryTime
+                };
+                await user.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'OTP sent to your email',
+                    currentStep: 2,
+                    nextStep: 'Verify OTP'
+                });
+            } else {
+                // Send OTP via SMS using Twilio
+                await twilioClient.verify.v2
+                    .services(process.env.TWILIO_SERVICE_SID)
+                    .verifications.create({
+                        to: user.phone,
+                        channel: 'sms'
+                    });
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'OTP sent to your phone',
+                    currentStep: 2,
+                    nextStep: 'Verify OTP'
+                });
+            }
+        }
+
+        // Step 2: Verify OTP and set new PIN
+        if (step === 2) {
+            if (!otp) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'OTP is required',
+                    currentStep: 2
+                });
+            }
+
+            if (!newPin || newPin.length !== 4 || isNaN(newPin)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'New PIN must be 4 digits',
+                    currentStep: 2
+                });
+            }
+
+            let otpVerified = false;
+
+            if (isEmail) {
+                // Verify email OTP
+                if (user.emailOtp.code !== otp) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid OTP',
+                        currentStep: 2
+                    });
+                }
+
+                if (new Date() > user.emailOtp.expiresAt) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'OTP expired',
+                        currentStep: 1
+                    });
+                }
+
+                otpVerified = true;
+            } else {
+                // Verify phone OTP with Twilio
+                const verification_check = await twilioClient.verify.v2
+                    .services(process.env.TWILIO_SERVICE_SID)
+                    .verificationChecks.create({
+                        to: user.phone,
+                        code: otp
+                    });
+
+                if (verification_check.status !== 'approved') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid OTP',
+                        currentStep: 2
+                    });
+                }
+
+                otpVerified = true;
+            }
+
+            if (otpVerified) {
+                // Hash and update PIN
+                const hashedPin = await bcrypt.hash(newPin, 10);
+                user.pin = hashedPin;
+                
+                // Clear any stored OTPs
+                user.emailOtp = { code: null, expiresAt: null };
+                
+                await user.save();
+
+                // Generate a new token with updated PIN
+                const token = generateToken(user._id, user.email, user.phone);
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'PIN reset successfully',
+                    token,
+                    currentStep: 'completed'
+                });
+            }
+        }
+
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid step',
+            currentStep: 1
+        });
+
+    } catch (error) {
+        console.error('Forget PIN error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error in forget PIN process',
+            error: error.message,
+            currentStep: 1
+        });
+    }
 }
 };
 

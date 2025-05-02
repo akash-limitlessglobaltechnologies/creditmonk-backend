@@ -9,5 +9,6 @@ console.log('Setting up delete account route');
 router.delete('/account', authMiddleware, userController.deleteAccount);
 // Login route
 router.post('/login', userController.login);
+router.post('/forget-pin', userController.forgetPin);
 
 module.exports = router;
